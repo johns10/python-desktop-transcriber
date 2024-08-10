@@ -1,0 +1,6 @@
+uuid
+pyaudio
+whisperx
+pydub
+torch
+spacy
