@@ -33,6 +33,7 @@ def transcribe_audio(audio_file, output_file):
         result = whisperx.assign_word_speakers(diarize_segments, result)
         json_data = []
         with open(output_file, "w") as f:
+            current_speaker = None
             for segment in result["segments"]:
                 start_time = f"{segment['start']:.2f}"
                 end_time = f"{segment['end']:.2f}"
