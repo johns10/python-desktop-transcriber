@@ -4,3 +4,4 @@ whisperx
 pydub
 torch
 spacy
+flair

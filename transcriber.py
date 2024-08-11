@@ -1,6 +1,7 @@
 import whisperx
 import torch
 import os
+import json
 
 
 def transcribe_audio(audio_file, output_file):
@@ -9,10 +10,8 @@ def transcribe_audio(audio_file, output_file):
         batch_size = 8
         compute_type = "int8"
         print(f"Using device: {device}")
-
         # Load ASR model
         model = whisperx.load_model("large-v2", device, compute_type=compute_type)
-
         audio = whisperx.load_audio(audio_file)
         result = model.transcribe(audio, batch_size=batch_size)
         model_a, metadata = whisperx.load_align_model(
@@ -31,19 +30,29 @@ def transcribe_audio(audio_file, output_file):
         )
         diarize_segments = diarize_model(audio)
         result = whisperx.assign_word_speakers(diarize_segments, result)
+
         json_data = []
         with open(output_file, "w") as f:
             current_speaker = None
             for segment in result["segments"]:
                 start_time = f"{segment['start']:.2f}"
                 end_time = f"{segment['end']:.2f}"
-
                 # Check if speaker has changed
                 if segment["speaker"] != current_speaker:
                     current_speaker = segment["speaker"]
                     f.write(f"\n[Speaker {current_speaker}]\n")
-
                 f.write(f"[{start_time}s - {end_time}s] {segment['text']}\n")
+
+                # Prepare word-level data
+                words_data = []
+                for word in segment.get("words", []):
+                    word_data = {
+                        "word": word["word"],
+                        "start": word.get("start", None),
+                        "end": word.get("end", None),
+                        "score": word.get("score", None),
+                    }
+                    words_data.append(word_data)
 
                 # Add segment info to JSON data
                 json_data.append(
@@ -52,6 +61,7 @@ def transcribe_audio(audio_file, output_file):
                         "end_time": float(end_time),
                         "speaker": current_speaker,
                         "text": segment["text"],
+                        "words": words_data,
                     }
                 )
 
@@ -63,8 +73,18 @@ def transcribe_audio(audio_file, output_file):
         json_file = os.path.splitext(output_file)[0] + ".json"
         with open(json_file, "w") as jf:
             json.dump(json_data, jf, indent=2)
-
-        print(f"JSON data with speaker information saved to: {json_file}")
+        print(
+            f"JSON data with speaker and word-level information saved to: {json_file}"
+        )
 
     except Exception as e:
         print(f"Error during transcription: {str(e)}")
+
+
+if __name__ == "__main__":
+    import sys
+
+    if len(sys.argv) != 3:
+        print("Usage: python transcriber.py <audio_file> <output_file>")
+    else:
+        transcribe_audio(sys.argv[1], sys.argv[2])
